@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Sensor Suhu IoT - Monitoring & Grafik</title>
+<style>
+  /* Reset and base */
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #FF0000, #00FFFF);
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: start;
+    max-width: 350px;
+    height: 600px;
+    margin: auto;
+    padding: 15px;
+    user-select: none;
+  }
+  h1 {
+    font-weight: 700;
+    font-size: 1.8rem;
+    margin: 0 0 10px;
+    text-align: center;
+    text-shadow: 0 0 8px rgba(0,0,0,0.3);
+  }
+  #temp-container {
+    display: flex;
+    justify-content: center;
+    align-items: baseline;
+    margin-bottom: 5px;
+  }
+  #temp-value {
+    font-size: 5rem;
+    font-weight: 900;
+    text-shadow: 0 0 15px rgba(255, 255, 255, 0.8);
+  }
+  #unit {
+    font-size: 2.5rem;
+    vertical-align: top;
+    margin-left: 5px;
+    user-select: none;
+    cursor: pointer;
+    transition: color 0.3s ease;
+  }
+  #unit:hover {
+    color: #ffd3b6;
+  }
+  #status {
+    font-size: 1.25rem;
+    opacity: 0.85;
+    margin-bottom: 15px;
+    font-style: italic;
+    text-align: center;
+  }
+  canvas {
+    width: 100% !important;
+    height: 200px !important;
+    margin-bottom: 10px;
+  }
+  #toggle-unit-btn {
+    display: block;
+    background: #ff8b94;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-weight: 700;
+    padding: 8px 15px;
+    cursor: pointer;
+    margin: 0 auto 5px auto;
+    user-select: none;
+    box-shadow: 0 4px 8px rgba(255,139,148,0.5);
+    transition: background-color 0.3s ease;
+  }
+  #toggle-unit-btn:hover {
+    background: #ff6b7a;
+  }
+  footer {
+    margin-top: auto;
+    font-size: 0.8rem;
+    opacity: 0.6;
+    text-align: center;
+    user-select: none;
+  }
+  /* Mobile scaling to max height 600px and width 350px */
+  @media (max-width: 350px) {
+    body {
+      width: 100vw;
+      height: 100vh;
+      max-width: 350px;
+      max-height: 600px;
+      overflow: hidden;
+      padding: 10px 5px;
+    }
+    #temp-value {
+      font-size: 4rem;
+    }
+  }
+</style>
+</head>
+<body>
+  <h1>Monitoring Sensor Suhu</h1>
+  <div id="temp-container">
+    <span id="temp-value">0</span><span id="unit" title="Klik untuk toggle satuan">°C</span>
+  </div>
+  <div id="status">Mengambil data suhu...</div>
+  <button id="toggle-unit-btn" aria-label="Toggle satuan suhu">Toggle °F / °C</button>
+  <canvas id="tempChart" aria-label="Grafik perubahan suhu" role="img"></canvas>
+
+  <footer>&copy; Ragel Adiansyah</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  // Inisialisasi variabel
+  let currentUnit = 'C';  // 'C' atau 'F'
+  const tempValueEl = document.getElementById('temp-value');
+  const unitEl = document.getElementById('unit');
+  const statusEl = document.getElementById('status');
+  const toggleBtn = document.getElementById('toggle-unit-btn');
+
+  // Data untuk chart suhu
+  const dataPoints = [];
+  const MAX_DATA_POINTS = 20;
+
+  // Setup Chart.js untuk grafik suhu
+  const ctx = document.getElementById('tempChart').getContext('2d');
+  const tempChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [{
+        label: 'Suhu (°C)',
+        data: [],
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        borderColor: '#fff',
+        borderWidth: 2,
+        fill: true,
+        tension: 0.3,
+        pointRadius: 3,
+        pointBackgroundColor: '#fff'
+      }]
+    },
+    options: {
+      responsive: true,
+      animation: false,
+      scales: {
+        y: {
+          suggestedMin: 10,
+          suggestedMax: 40,
+          ticks: {
+            color: 'white',
+          },
+          grid: {
+            color: 'rgba(255,255,255,0.2)'
+          }
+        },
+        x: {
+          ticks: {
+            color: 'white',
+          },
+          grid: {
+            color: 'rgba(255,255,255,0.15)'
+          }
+        }
+      },
+      plugins: {
+        legend: {
+          labels: {
+            color: 'white',
+            font: { weight: 'bold' }
+          }
+        }
+      },
+      interaction: {
+        intersect: false,
+        mode: 'nearest'
+      }
+    }
+  });
+
+  // Fungsi untuk mendapatkan suhu simulasi dalam Celsius
+  function getSimulatedTemperatureCelsius() {
+    // Random float 20.0 - 35.0
+    return (20 + Math.random() * 15);
+  }
+
+  // Fungsi konversi Celsius ke Fahrenheit
+  function celsiusToFahrenheit(c) {
+    return (c * 9/5) + 32;
+  }
+
+  // Fungsi konversi Fahrenheit ke Celsius
+  function fahrenheitToCelsius(f) {
+    return (f - 32) * 5/9;
+  }
+
+  // Update tampilan suhu dan status
+  function updateTemperature() {
+    let tempC = getSimulatedTemperatureCelsius();
+    if (currentUnit === 'F') {
+      // Tampilkan dalam Fahrenheit
+      let tempF = celsiusToFahrenheit(tempC);
+      tempValueEl.textContent = tempF.toFixed(1);
+      unitEl.textContent = '°F';
+      tempChart.data.datasets[0].label = 'Suhu (°F)';
+      // Simpan ke data chart dalam Fahrenheit agar sesuai tampilannya
+      addDataPoint(tempF);
+      updateStatus(tempF, 'F');
+    } else {
+      // Tampilkan dalam Celsius
+      tempValueEl.textContent = tempC.toFixed(1);
+      unitEl.textContent = '°C';
+      tempChart.data.datasets[0].label = 'Suhu (°C)';
+      // Simpan ke data chart dalam Celsius
+      addDataPoint(tempC);
+      updateStatus(tempC, 'C');
+    }
+    tempChart.update();
+  }
+
+  // Update status teks dan warna sesuai suhu & unit
+  function updateStatus(temp, unit) {
+    const tempC = (unit === 'C') ? temp : fahrenheitToCelsius(temp);
+    if(tempC < 25) {
+      statusEl.textContent = "Suhu Normal";
+      statusEl.style.color = '#a8e6cf';
+    } else if(tempC < 30) {
+      statusEl.textContent = "Suhu Sedang";
+      statusEl.style.color = '#ffd3b6';
+    } else {
+      statusEl.textContent = "Suhu Tinggi!";
+      statusEl.style.color = '#ff8b94';
+      // Optional: bisa tambahkan alert atau animasi notifikasi disini jika diinginkan
+    }
+  }
+
+  // Menambahkan titik data baru ke grafik dengan batasan data points
+  function addDataPoint(temp) {
+    const now = new Date();
+    const label = now.toLocaleTimeString([], {minute: '2-digit', second: '2-digit'});
+    dataPoints.push({label: label, temp: temp});
+    if(dataPoints.length > MAX_DATA_POINTS) {
+      dataPoints.shift();
+    }
+    tempChart.data.labels = dataPoints.map(dp => dp.label);
+    tempChart.data.datasets[0].data = dataPoints.map(dp => dp.temp);
+  }
+
+  // Toggle satuan suhu dengan tombol atau klik unit
+  function toggleUnit() {
+    currentUnit = (currentUnit === 'C') ? 'F' : 'C';
+    updateTemperature();
+  }
+
+  // Event listener tombol dan unit untuk toggle
+  toggleBtn.addEventListener('click', toggleUnit);
+  unitEl.addEventListener('click', toggleUnit);
+
+  // Update suhu pertama kali
+  updateTemperature();
+  // Update suhu tiap 3 detik
+  setInterval(updateTemperature, 3000);
+</script>
+</body>
+</html>
+</content>
+</create_file>
